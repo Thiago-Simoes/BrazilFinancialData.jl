@@ -8,6 +8,7 @@ using Dates
 using Downloads
 using XLSX
 using MethodAnalysis
+using StringEncodings
 
 
 include("FundsCVM.jl")

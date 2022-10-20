@@ -1,3 +1,15 @@
+# Summary
+# 
+# &&&&& Functions &&&&&
+# get_daily_inf_month
+# get_daily_inf_period
+# get_fund_daily_inf
+# get_statement_year
+# get_statement_period
+# get_fund_statement_period
+
+# export get_daily_inf_month, get_daily_inf_period, get_fund_daily_inf, get_statement_year, get_statement_period, get_fund_statement_period
+
 module FundsCVM
 
 using ..DataFrames
@@ -8,15 +20,18 @@ using ..Dates
 using ..Downloads
 using ..XLSX
 using ..MethodAnalysis
+using ..StringEncodings
 
-import JuliaInterpreter
 
-# For fast debugging
-push!(JuliaInterpreter.compiled_modules, Base)
-visit(Base) do item
-    isa(item, Module) && push!(JuliaInterpreter.compiled_modules, item)
-    true
-end
+# TODO: Remove this, is only for debugging
+# import JuliaInterpreter
+
+# # For fast debugging
+# push!(JuliaInterpreter.compiled_modules, Base)
+# visit(Base) do item
+#     isa(item, Module) && push!(JuliaInterpreter.compiled_modules, item)
+#     true
+# end
 
 struct Fund
     fund_type::Union{String, Nothing}
@@ -34,7 +49,7 @@ end
 
 
 """
-    get_data_month(
+    get_daily_inf_month(
         date::Date;
         generate_csv=false,
         csv_path="cvm_data.csv"    
@@ -49,17 +64,17 @@ database and returns formated in a DataFrame.
 - `csv_path`: the path where the CSV file will be saved.
 
 # Examples
-julia> BrazilFinancialData.FundsCVM.get_data_month(Date(2020,6,10))  
-julia> BrazilFinancialData.FundsCVM.get_data_month(Date(2020,6,10), generate_xlsx=true, xlsx_path="./FundsData.xlsx")  
+julia> BrazilFinancialData.FundsCVM.get_daily_inf_month(Date(2020,6,10))  
+julia> BrazilFinancialData.FundsCVM.get_daily_inf_month(Date(2020,6,10), generate_xlsx=true, xlsx_path="./FundsData.xlsx")  
 
 """
-function get_data_month(
+function get_daily_inf_month(
     date::Date;
     generate_csv=false,
     csv_path="cvm_data.csv"
 )::DataFrame
-    path = _get_data_path(date)
-    ret = _get_data(path)
+    path = _get_daily_inf_path(date)
+    ret = _get_fund_quotes(path)
     
     if generate_csv
         CSV.write(csv_path, ret)
@@ -70,7 +85,7 @@ end
 
 
 """
-    get_data_period(
+    get_daily_inf_period(
         initial_date::Date,
         final_date::Date;
         include_begin=true,
@@ -92,9 +107,9 @@ specific days.
 - `csv_path`: the path where the CSV file will be saved.
 
 # Example
-julia> BrazilFinancialData.FundsCVM.get_data_period(Date(2020,6,10), Date(2020,8,14), include_end=false, include_begin=false)
+julia> BrazilFinancialData.FundsCVM.get_daily_inf_period(Date(2020,6,10), Date(2020,8,14), include_end=false, include_begin=false)
 """
-function get_data_period(
+function get_daily_inf_period(
     initial_date::Date,
     final_date::Date;
     include_begin=true,
@@ -114,13 +129,13 @@ function get_data_period(
     end
 
     function foo(date::Date)::DataFrame
-        return _get_data(_get_data_path(date), true)
+        return _get_fund_quotes(_get_daily_inf_path(date), true)
     end
 
     op1 = include_begin ? (<=) : (<)
     op2 = include_end ? (<=) : (<)
 
-    years_data = length(years) > 1 ? vcat((foo.(years))...) : _get_data(_get_data_path(years[1]), true)
+    years_data = length(years) > 1 ? vcat((foo.(years))...) : _get_fund_quotes(_get_daily_inf_path(years[1]), true)
 
     ret = years_data[(op1).(initial_date, years_data.DT_COMPTC) .* (op2).(years_data.DT_COMPTC, final_date), :]
 
@@ -133,7 +148,7 @@ end
 
 
 """
-    function get_fund_data(
+    get_fund_daily_inf(
         fund_cnpj::String,
         initial_date::Date,
         final_date::Date;
@@ -162,9 +177,9 @@ specific days.
 - `csv_path`: the path where the CSV file will be saved.
 
 # Example
-julia> BrazilFinancialData.FundsCVM.get_fund_data("97.929.213/0001-34", Date(2021,1), Date(2021,2), include_end=false, generate_xlsx=true, xlsx_path = "fund.xlsx"
+julia> BrazilFinancialData.FundsCVM.get_fund_daily_inf("97.929.213/0001-34", Date(2021,1), Date(2021,2), include_end=false, generate_xlsx=true, xlsx_path = "fund.xlsx"
 """
-function get_fund_data(
+function get_fund_daily_inf(
     fund_cnpj::String,
     initial_date::Date,
     final_date::Date;
@@ -179,7 +194,7 @@ function get_fund_data(
     if (generate_csv && generate_xlsx)
         @warn "You are generating CSV and XLSX at same time. This can lead to long waits."
     end
-    df_data = (FundsCVM.get_data_period(initial_date, final_date, include_begin = include_begin, include_end = include_end))
+    df_data = (FundsCVM.get_daily_inf_period(initial_date, final_date, include_begin = include_begin, include_end = include_end))
     if only_quotes
         df_ret = df_data[df_data.CNPJ_FUNDO .== fund_cnpj, [:DT_COMPTC, :VL_QUOTA]]
     else
@@ -199,7 +214,181 @@ function get_fund_data(
 end
 
 
-function _get_data_path(date::Date)::Tuple{HistoricalType, String, String, Date}
+"""
+    get_statement_year(date::Date)::DataFrame
+
+Get the statement of all funds in a specific year from CVM(Comissão de Valores Mobiliários)
+database and returns formated in a DataFrame.
+
+# Arguments
+- `date`: a Date, the desired year.
+# Example
+julia> BrazilFinancialData.FundsCVM.get_statement_year(Date(2021))
+"""
+function get_statement_year(date::Date)::DataFrame
+    path = _get_statement_path(date)
+    df_ret = _get_fund_statement(path)
+    return df_ret
+end
+
+
+"""
+    get_statement_period(
+        initial_date::Date,
+        final_date::Date,
+        include_begin::Bool=true,
+        include_end::Bool=true
+    )::DataFrame
+
+Get the statement of all funds in a specific period of years from CVM(Comissão de Valores Mobiliários)
+database and returns formated in a DataFrame.
+
+# Arguments
+- `initial_date`: a Date, the initial date.
+- `final_date`: a Date, the final date.
+- `final_date`: a Date, the final date.
+- `include_begin`: if true the first day will be include. Otherwise only the days after will.
+- `include_end`: if true the last day will be include. Otherwise only the days before will.
+
+# Example
+julia> BrazilFinancialData.FundsCVM.get_statement_period(Date(2020), Date(2021))
+"""
+function get_statement_period(
+    initial_date::Date,
+    final_date::Date,
+    include_begin::Bool=true,
+    include_end::Bool=true
+)::DataFrame
+    initial_year, final_year = year(initial_date), year(final_date)
+    @assert initial_year<=final_year "`initial_date` must be smaller or equal `final_date`."
+    years = collect(initial_year:final_year)
+
+    function foo(x::Date)
+        return _get_fund_statement(_get_statement_path(x))
+    end
+
+    df_ret = DataFrame()
+    for year in years
+        df_tmp = foo(Date(year))
+        show(df_tmp)
+        df_ret = vcat(df_ret, df_tmp)
+    end
+
+    op1 = include_begin ? (<=) : (<)
+    op2 = include_end ? (<=) : (<)
+
+    ret = df_ret[(op1).(initial_date, df_ret.DT_COMPTC) .* (op2).(df_ret.DT_COMPTC, final_date), :]
+
+    return ret
+end
+
+
+"""
+    get_fund_statement_period(
+        fund_cnpj::String,
+        initial_date::Date,
+        final_date::Date,
+        include_begin::Bool=true,
+        include_end::Bool=true,
+        generate_xlsx::Bool = false,
+        xlsx_path::String = "",
+        generate_csv::Bool = false,
+        csv_path::String = ""
+    )::DataFrame
+
+Get the statement of a specific fund in a specific period of years from CVM(Comissão de Valores Mobiliários)
+database and returns formated in a DataFrame. Can export CSV or/and XLSX files.
+
+# Arguments
+- `fund_cnpj`: a String, the CNPJ of the desired fund.
+- `initial_date`: the initial date of the period.
+- `final_date`: the final date of the period.
+- `include_begin`: if true the first day will be include. Otherwise only the days after will.
+- `include_end`: if true the last day will be include. Otherwise only the days before will.
+- `generate_xlsx`: if true will be generated a XLSX file from the return DataFrame.
+- `xlxs_path`: the path where the XLSX file will be saved.
+- `generate_csv`: if true will be generated a CSV file from the return DataFrame.
+- `csv_path`: the path where the CSV file will be saved.
+
+# Example
+julia> BrazilFinancialData.FundsCVM.get_fund_statement_period(Date(2020), Date(2021))
+"""
+function get_fund_statement_period(
+    fund_cnpj::String,
+    initial_date::Date,
+    final_date::Date,
+    include_begin::Bool=true,
+    include_end::Bool=true,
+    generate_xlsx::Bool = false,
+    xlsx_path::String = "",
+    generate_csv::Bool = false,
+    csv_path::String = ""
+)::DataFrame
+    initial_year, final_year = year(initial_date), year(final_date)
+
+    @assert initial_year<=final_year "`initial_date` must be smaller or equal `final_date`."
+    years = collect(initial_year:final_year)
+
+    function foo(x::Date)
+        return _get_fund_statement(_get_statement_path(x))
+    end
+
+    df_ret = DataFrame()
+    for year in years
+        df_tmp = foo(Date(year))
+        df_ret = vcat(df_ret, df_tmp)
+    end
+
+    op1 = include_begin ? (<=) : (<)
+    op2 = include_end ? (<=) : (<)
+
+    df_ret = df_ret[(op1).(initial_date, df_ret.DT_COMPTC) .* (op2).(df_ret.DT_COMPTC, final_date), :]
+    ret = df_ret[df_ret.CNPJ_FUNDO .== fund_cnpj, :]
+
+    if generate_xlsx
+        @assert (xlsx_path != "") "A xlsx_path must be passed."
+        XLSX.writetable(xlsx_path, ret)
+    end
+    if generate_csv
+        @assert (csv_path != "") "A csv_path must be passed."
+        CSV.write(csv_path, ret)
+    end
+
+    return ret
+end
+
+
+function _get_statement_path(date::Date)::Tuple{String, Date}
+    dt_year = year(date)
+    @assert dt_year > 2014 "There is no data prior to 2015"
+    str_year = string(dt_year)
+    str_link = "https://dados.cvm.gov.br/dados/FI/DOC/EXTRATO/DADOS/extrato_fi_$(str_year).csv"
+    return (str_link, date)
+end
+
+
+function _get_fund_statement(data_path::Tuple{String, Date})::DataFrame
+    @assert year(data_path[2]) > 2014 "There is no data prior to 2014."
+
+    tmp_file = "$(tempname()).csv"
+    # try
+        Downloads.download(data_path[1], tmp_file)
+        
+        @assert isfile(tmp_file)
+        
+        ret = CSV.File(open(read, tmp_file, enc"CP1252"), decimal='.', delim=';') |> DataFrame
+
+        DataFrames.sort!(ret, :DT_COMPTC)
+        
+        rm(tmp_file)
+        return ret
+    # catch err
+        error("No file for the year $(data_path[2]) found in $(data_path[1]).")
+    # end
+end
+
+
+function _get_daily_inf_path(date::Date)::Tuple{HistoricalType, String, String, Date}
     str_year = string(year(date))
     str_month = month(date) >= 10 ? string(month(date)) : "0"*string(month(date))
     
@@ -217,7 +406,9 @@ function _get_data_path(date::Date)::Tuple{HistoricalType, String, String, Date}
     return (type, str_link_path, filename, date)
 end
 
-function _get_data(data_path::Tuple{HistoricalType, String, String, Date}, all_year::Bool = false)::DataFrame
+function _get_fund_quotes(data_path::Tuple{HistoricalType, String, String, Date}, all_year::Bool = false)::DataFrame
+    @assert year(data_path[4]) > 2004 "There is no data prior to 2005."
+
     if all_year && year(data_path[4])<2021
         tmp_file = "$(tempname()).zip"
         Downloads.download(data_path[2], tmp_file)
@@ -240,7 +431,7 @@ function _get_data(data_path::Tuple{HistoricalType, String, String, Date}, all_y
     elseif all_year
         ret = DataFrame()
         for month in 1:12
-            ret = vcat(ret, get_data_month(Date(year(data_path[4]), month)))
+            ret = vcat(ret, get_daily_inf_month(Date(year(data_path[4]), month)))
         end
         return ret
     end
