@@ -7,7 +7,7 @@ Ideas can also, and should, be sent.
 > # Installing
 > 1. In Julia terminal, activate your enviroment.
 > 2. Paste `using Pkg`.
-> 3. Paste `Pkg.add(url="https://github.com/Thiago-Simoes/BrazilFinancialData.jl")`
+> 3. Paste `Pkg.add("BrazilFinancialData")`
 > 4. That's all! 🎉🎉 
   
   
