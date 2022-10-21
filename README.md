@@ -47,8 +47,6 @@ Ideas can also, and should, be sent.
 > - Cesta Basica SaoPaulo  
 > - Cesta Basica Vitoria  
 
-> *Both data can be for a specific fund.
 
-  
 *This package is a work in progress.*
 
