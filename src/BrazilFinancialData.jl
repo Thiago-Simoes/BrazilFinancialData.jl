@@ -12,11 +12,9 @@ using StringEncodings
 
 
 include("FundsCVM.jl")
-include("CiaCVM.jl")
 include("Bacen.jl")
 
 export FundsCVM
-export CiaCVM
 export Bacen
 
 end # module BrazilFinancialData
