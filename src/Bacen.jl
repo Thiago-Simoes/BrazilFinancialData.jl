@@ -1,36 +1,67 @@
-# Summary
-# 
-# &&&&& Functions &&&&&
-# get_daily_inf_month
-# get_daily_inf_period
-# get_fund_daily_inf
-# get_statement_year
-# get_statement_period
-# get_fund_statement_period
-
-# export get_daily_inf_month, get_daily_inf_period, get_fund_daily_inf, get_statement_year, get_statement_period, get_fund_statement_period
-
 module Bacen
 
-using DataFrames
-using CSV
-using HTTP
-using ZipFile
-using Dates
-using Downloads
-using XLSX
-using MethodAnalysis
-using StringEncodings
+using ..DataFrames
+using ..CSV
+using ..HTTP
+using ..ZipFile
+using ..Dates
+using ..Downloads
+using ..XLSX
+using ..MethodAnalysis
+using ..StringEncodings
 
-@enum BacenDataTypes money_BRL
+@enum BacenDataTypes Money_BRL Percentage Values
 
 
 const bacen_data_indx = Dict(
-    :IPCA => (433, money_BRL)
+    :IPCA => (433, Money_BRL),
+    :SELIC => (1178, Percentage),
+    :USD_BRL => (10813, Money_BRL),
+    :CAGED => (28763, Values),
+    :SINAPI => (7495, Percentage),
+    :PIB => (1207, Money_BRL),
+    :IC_BR => (27574, Values),
+    :UtilizacaoCapacidadeIndustrial => (1344, Percentage),
+    :Desemprego => (24369, Percentage),
+    :DividaLiq => (2053, Money_BRL),
+    :DividaLiqPIB => (4503, Percentage),
+    # Cestas basicas
+    :CestaBasicaAracaju => (7479, Money_BRL), 
+    :CestaBasicaBelem => (7480, Money_BRL), 
+    :CestaBasicaBeloHorizonte => (7481, Money_BRL), 
+    :CestaBasicaBrasilia => (7482, Money_BRL), 
+    :CestaBasicaCuritiba => (7483, Money_BRL), 
+    :CestaBasicaFlorianopolis => (7484, Money_BRL), 
+    :CestaBasicaFortaleza => (7485, Money_BRL), 
+    :CestaBasicaGoiania => (7486, Money_BRL), 
+    :CestaBasicaJoaoPessoa => (7487, Money_BRL), 
+    :CestaBasicaNatal => (7488, Money_BRL), 
+    :CestaBasicaPortoAlegre => (7489, Money_BRL), 
+    :CestaBasicaRecife => (7490, Money_BRL), 
+    :CestaBasicaRJ => (7491, Money_BRL), 
+    :CestaBasicaSalvador => (7492, Money_BRL), 
+    :CestaBasicaSaoPaulo => (7493, Money_BRL), 
+    :CestaBasicaVitoria => (7494, Money_BRL), 
 )
 
 
-function ipca(
+ipca(parms::Vector = [])::DataFrame = return get_indicator(:IPCA, parms...)
+selic(parms::Vector = [])::DataFrame = return get_indicator(:SELIC, parms...)
+usd_brl(parms::Vector = [])::DataFrame = return get_indicator(:USD_BRL, parms...)
+caged(parms::Vector = [])::DataFrame = return get_indicator(:CAGED, parms...)
+sinapi(parms::Vector = [])::DataFrame = return get_indicator(:SINAPI, parms...)
+pib(parms::Vector = [])::DataFrame = return get_indicator(:PIB, parms...)
+ic_br(parms::Vector = [])::DataFrame = return get_indicator(:IC_BR, parms...)
+utilizacao_capacidade_industrial(parms::Vector = [])::DataFrame = return get_indicator(:UtilizacaoCapacidadeIndustrial, parms...)
+desemprego(parms::Vector = [])::DataFrame = return get_indicator(:Desemprego, parms...)
+divida_liq(parms::Vector = [])::DataFrame = return get_indicator(:DividaLiq, parms...)
+divida_liq_pib(parms::Vector = [])::DataFrame = return get_indicator(:DividaLiqPIB, parms...)
+
+
+
+
+function get_indicator(
+    indicator::Union{Symbol, Int64},
     initial_date::Union{Nothing, Date} = nothing,
     final_date::Union{Nothing, Date} = nothing,
     generate_xlsx::Bool = false,
@@ -38,7 +69,7 @@ function ipca(
     generate_csv::Bool = false,
     csv_path::String = ""
 )::DataFrame
-    ret = get_bacen_data(:IPCA, initial_date, final_date)
+    ret = _get_bacen_data(indicator, initial_date, final_date)
     if generate_xlsx
         @assert (xlsx_path != "") "A xlsx_path must be passed."
         XLSX.writetable(xlsx_path, ret)
@@ -51,13 +82,20 @@ function ipca(
 end
 
 
-function get_bacen_data(
-    indicator::Symbol,
+function _get_bacen_data(
+    indicator::Union{Symbol, Int64},
     initial_date::Union{Date, Nothing} = nothing,
     final_date::Union{Date, Nothing} = nothing
-)
-    bacen_indx = bacen_data_indx[indicator]
-    str_cod_bacen = string(bacen_indx[1])
+)::DataFrame
+    if typeof(indicator) <: Symbol
+        bacen_indx = bacen_data_indx[indicator]
+        str_cod_bacen = string(bacen_indx[1])
+        type = bacen_indx[2]
+    else 
+        str_cod_bacen = string(indicator)
+        type = Values
+    end
+
     if typeof(initial_date) <: Nothing || typeof(final_date) <: Nothing
         str_path = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.$(str_cod_bacen)/dados?formato=csv"
     else
@@ -78,7 +116,7 @@ function get_bacen_data(
     end
     
     if "valor" in names(df_ret)
-        foo(x) = _data_converter(x, bacen_indx[2])
+        foo(x) = _data_converter(x, type)
         df_ret.valor = foo.(df_ret.valor)
         rename!(df_ret, "valor" => string(indicator))
     end
@@ -89,10 +127,16 @@ function get_bacen_data(
 end
 
 function _data_converter(input::String, dataType::BacenDataTypes)::Float64
-    if dataType == money_BRL
-       return parse(Float64, replace(replace(replace(input, ',' => '*'), '.' => ','), '*' => '.'))
+    if dataType == Money_BRL
+       return _parse_from_brazilian_to_float64(input)
+    elseif dataType == Percentage
+        return (_parse_from_brazilian_to_float64(input))/100
+    elseif dataType == Values
+        return (_parse_from_brazilian_to_float64(input))
     end
 end
+
+_parse_from_brazilian_to_float64(x::String)::Float64 = parse(Float64, replace(replace(replace(x, ',' => '*'), '.' => ','), '*' => '.'))
 
 function _convert_date_to_BR(date::Date)::String
     dia = day(date)>9 ? string(day(date)) : string(0, day(date))
@@ -108,5 +152,7 @@ function _convert_BR_to_date(date::String)::Date
 
     return Date(ano, mes, dia)
 end
+
+export get_indicator, ipca, selic, usd_brl, caged, sinapi, pib, ic_br, utilizacao_capacidade_industrial, desemprego, divida_liq, divida_liq_pib,
 
 end # Module Bacen

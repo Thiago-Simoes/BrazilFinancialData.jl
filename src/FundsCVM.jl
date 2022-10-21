@@ -8,7 +8,6 @@
 # get_statement_period
 # get_fund_statement_period
 
-# export get_daily_inf_month, get_daily_inf_period, get_fund_daily_inf, get_statement_year, get_statement_period, get_fund_statement_period
 
 module FundsCVM
 
