@@ -116,8 +116,8 @@ function get_daily_inf_period(
     generate_csv=false,
     csv_path="cvm_data.csv"
 )::DataFrame
-    initial_year = year(initial_date)
-    final_year = year(final_date)
+    initial_year = Dates.year(initial_date)
+    final_year = Dates.year(final_date)
 
     @assert initial_date<final_date "'final_date' must be smaller than 'initial_date'."
     @assert final_date<=Dates.Date(Dates.now())
@@ -214,7 +214,7 @@ end
 
 
 """
-    get_statement_year(date::Date)::DataFrame
+    get_statement_Dates.year(date::Date)::DataFrame
 
 Get the statement of all funds in a specific year from CVM(Comissão de Valores Mobiliários)
 database and returns formated in a DataFrame.
@@ -222,9 +222,9 @@ database and returns formated in a DataFrame.
 # Arguments
 - `date`: a Date, the desired year.
 # Example
-julia> BrazilFinancialData.FundsCVM.get_statement_year(Date(2021))
+julia> BrazilFinancialData.FundsCVM.get_statement_Dates.year(Date(2021))
 """
-function get_statement_year(date::Date)::DataFrame
+function get_statement_Dates.year(date::Date)::DataFrame
     path = _get_statement_path(date)
     df_ret = _get_fund_statement(path)
     return df_ret
@@ -258,7 +258,7 @@ function get_statement_period(
     include_begin::Bool=true,
     include_end::Bool=true
 )::DataFrame
-    initial_year, final_year = year(initial_date), year(final_date)
+    initial_year, final_year = Dates.year(initial_date), Dates.year(final_date)
     @assert initial_year<=final_year "`initial_date` must be smaller or equal `final_date`."
     years = collect(initial_year:final_year)
 
@@ -323,7 +323,7 @@ function get_fund_statement_period(
     generate_csv::Bool = false,
     csv_path::String = ""
 )::DataFrame
-    initial_year, final_year = year(initial_date), year(final_date)
+    initial_year, final_year = Dates.year(initial_date), Dates.year(final_date)
 
     @assert initial_year<=final_year "`initial_date` must be smaller or equal `final_date`."
     years = collect(initial_year:final_year)
@@ -358,7 +358,7 @@ end
 
 
 function _get_statement_path(date::Date)::Tuple{String, Date}
-    dt_year = year(date)
+    dt_year = Dates.year(date)
     @assert dt_year > 2014 "There is no data prior to 2015"
     str_year = string(dt_year)
     str_link = "https://dados.cvm.gov.br/dados/FI/DOC/EXTRATO/DADOS/extrato_fi_$(str_year).csv"
@@ -367,7 +367,7 @@ end
 
 
 function _get_fund_statement(data_path::Tuple{String, Date})::DataFrame
-    @assert year(data_path[2]) > 2014 "There is no data prior to 2014."
+    @assert Dates.year(data_path[2]) > 2014 "There is no data prior to 2014."
 
     tmp_file = "$(tempname()).csv"
     # try
@@ -388,10 +388,10 @@ end
 
 
 function _get_daily_inf_path(date::Date)::Tuple{HistoricalType, String, String, Date}
-    str_year = string(year(date))
+    str_year = string(Dates.year(date))
     str_month = month(date) >= 10 ? string(month(date)) : "0"*string(month(date))
     
-    if year(date)<2021
+    if Dates.year(date)<2021
         str_link_path = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS/HIST/inf_diario_fi_$(str_year).zip"
         type = HistoricalData
     else
@@ -406,9 +406,9 @@ function _get_daily_inf_path(date::Date)::Tuple{HistoricalType, String, String, 
 end
 
 function _get_fund_quotes(data_path::Tuple{HistoricalType, String, String, Date}, all_year::Bool = false)::DataFrame
-    @assert year(data_path[4]) > 2004 "There is no data prior to 2005."
+    @assert Dates.year(data_path[4]) > 2004 "There is no data prior to 2005."
 
-    if all_year && year(data_path[4])<2021
+    if all_year && Dates.year(data_path[4])<2021
         tmp_file = "$(tempname()).zip"
         Downloads.download(data_path[2], tmp_file)
         @assert isfile(tmp_file)
@@ -429,8 +429,8 @@ function _get_fund_quotes(data_path::Tuple{HistoricalType, String, String, Date}
         return ret
     elseif all_year
         ret = DataFrame()
-        year = year(data_path[4])
-        max = year == year(Dates.today) ? min(12, month(today()-1)) : 12
+        year = Dates.year(data_path[4])
+        max = year == Dates.year(Dates.today) ? min(12, month(today()-1)) : 12
         for month in 1:max
             ret = vcat(ret, get_daily_inf_month(Date(year, month)))
         end
