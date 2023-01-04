@@ -430,7 +430,7 @@ function _get_fund_quotes(data_path::Tuple{HistoricalType, String, String, Date}
     elseif all_year
         ret = DataFrame()
         year = Dates.year(data_path[4])
-        max = year == Dates.year(Dates.today) ? min(12, month(today()-1)) : 12
+        max = year == Dates.year(Dates.today) ? min(12, month(today()-Day(1))) : 12
         for month in 1:max
             ret = vcat(ret, get_daily_inf_month(Date(year, month)))
         end
