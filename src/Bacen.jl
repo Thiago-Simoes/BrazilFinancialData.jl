@@ -153,6 +153,6 @@ function _convert_BR_to_date(date::String)::Date
     return Date(ano, mes, dia)
 end
 
-export get_indicator, ipca, selic, usd_brl, caged, sinapi, pib, ic_br, utilizacao_capacidade_industrial, desemprego, divida_liq, divida_liq_pib,
+export get_indicator, ipca, selic, usd_brl, caged, sinapi, pib, ic_br, utilizacao_capacidade_industrial, desemprego, divida_liq, divida_liq_pib
 
 end # Module Bacen
