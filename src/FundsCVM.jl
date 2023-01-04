@@ -214,7 +214,7 @@ end
 
 
 """
-    get_statement_Dates.year(date::Date)::DataFrame
+    get_statement_year(date::Date)::DataFrame
 
 Get the statement of all funds in a specific year from CVM(Comissão de Valores Mobiliários)
 database and returns formated in a DataFrame.
@@ -224,7 +224,7 @@ database and returns formated in a DataFrame.
 # Example
 julia> BrazilFinancialData.FundsCVM.get_statement_Dates.year(Date(2021))
 """
-function get_statement_Dates.year(date::Date)::DataFrame
+function get_statement_year(date::Date)::DataFrame
     path = _get_statement_path(date)
     df_ret = _get_fund_statement(path)
     return df_ret
