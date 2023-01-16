@@ -25,6 +25,8 @@ const bacen_data_indx = Dict(
     :Desemprego => (24369, Percentage),
     :DividaLiq => (2053, Money_BRL),
     :DividaLiqPIB => (4503, Percentage),
+    :CDI_Diario => (12, Percentage),
+    :CDI_Diario_Anualizado => (4389, Percentage),
     # Cestas basicas
     :CestaBasicaAracaju => (7479, Money_BRL), 
     :CestaBasicaBelem => (7480, Money_BRL), 
@@ -56,6 +58,9 @@ utilizacao_capacidade_industrial(parms::Vector = [])::DataFrame = return get_ind
 desemprego(parms::Vector = [])::DataFrame = return get_indicator(:Desemprego, parms...)
 divida_liq(parms::Vector = [])::DataFrame = return get_indicator(:DividaLiq, parms...)
 divida_liq_pib(parms::Vector = [])::DataFrame = return get_indicator(:DividaLiqPIB, parms...)
+cdi_diario(parms::Vector = [])::DataFrame = return get_indicator(:CDI_Diario, parms...)
+cdi_diario_anualizado(parms::Vector = [])::DataFrame = return get_indicator(:CDI_Diario_Anualizado, parms...)
+
 
 
 
