@@ -21,6 +21,8 @@ using ..XLSX
 using ..MethodAnalysis
 using ..StringEncodings
 
+include(string(@__DIR__,"/Utils.jl"))
+
 
 # TODO: Remove this, is only for debugging
 # import JuliaInterpreter
@@ -370,7 +372,7 @@ function _get_fund_statement(data_path::Tuple{String, Date})::DataFrame
     @assert Dates.year(data_path[2]) > 2014 "There is no data prior to 2014."
 
     tmp_file = "$(tempname()).csv"
-    # try
+    try
         Downloads.download(data_path[1], tmp_file)
         
         @assert isfile(tmp_file)
@@ -381,9 +383,72 @@ function _get_fund_statement(data_path::Tuple{String, Date})::DataFrame
         
         rm(tmp_file)
         return ret
-    # catch err
+    catch err
         error("No file for the year $(data_path[2]) found in $(data_path[1]).")
-    # end
+    end
+end
+
+
+function get_latest_fund_composition(fund_cnpj::String)::DataFrame
+    @assert ndigits(clean_numbers(fund_cnpj, cnpj = true)) == 14 "The CNPJ must have 14 digits."
+
+    ret = Dict{String, DataFrame}()
+    date = Dates.today()
+
+    while (ret == Dict{String, DataFrame}())
+        tmp = _get_funds_sheet(date)
+        if haskey(tmp, fund_cnpj)
+            ret = tmp[fund_cnpj]
+        end
+        date = date - Dates.Month(1)
+    end
+
+    return ret    
+end
+
+
+function _get_funds_sheet(date::Dates.Date)::Dict{String, DataFrame}
+    @assert Dates.year(date) > 2014 "There is no data prior to 2014."
+
+    str_date = date_to_string(date)
+    
+    if Dates.year(date) < 2019
+        endpoint = "https://dados.cvm.gov.br/dados/FI/DOC/LAMINA/DADOS/HIST/lamina_fi_"
+    else
+        endpoint = "https://dados.cvm.gov.br/dados/FI/DOC/LAMINA/DADOS/lamina_fi_"
+    end
+
+    url = endpoint * str_date * ".zip"
+    tmp_file = "$(tempname()).zip"
+    try
+        Downloads.download(url, tmp_file)
+        
+        @assert isfile(tmp_file)
+
+        for f in (ZipFile.Reader(tmp_file)).files
+            if f.name == "lamina_fi_carteira_$str_date.csv"
+                temp_str = "$(tempname()).csv"
+                io = open(temp_str, "w")
+                write(io, f)
+                tmp = CSV.File(open(read, temp_str, enc"CP1252"), decimal='.', delim=';') |> DataFrame
+                # tmp = CSV.File(f, decimal='.', delim=';') |> DataFrame
+                DataFrames.sort!(tmp, :DT_COMPTC)
+                transform!(tmp, 
+                    :CNPJ_FUNDO => (x -> string.(x)) => :CNPJ_FUNDO
+                )
+                # Normalize data to make the sum equal 1(100%)
+                # Some funds have a sum different than 1(100%)
+                [tmp[tmp.CNPJ_FUNDO .== cnpj, "PR_PL_ATIVO"] ./= sum(tmp[tmp.CNPJ_FUNDO .== cnpj, "PR_PL_ATIVO"]) for cnpj in unique(tmp.CNPJ_FUNDO)];
+                rm(tmp_file)
+                rm(temp_str)
+                ret = Dict([cnpj => tmp[tmp.CNPJ_FUNDO .== cnpj, [:DENOM_SOCIAL, :DT_COMPTC, :TP_ATIVO, :PR_PL_ATIVO]] for cnpj in unique(tmp.CNPJ_FUNDO)])
+                return ret
+            end
+        end
+    catch err
+        println("No file for the date $(str_date) found in $(url).")
+        Dict{String, DataFrame}()
+    end
 end
 
 
