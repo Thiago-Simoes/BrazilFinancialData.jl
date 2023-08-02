@@ -142,6 +142,7 @@ function _data_converter(input::String, dataType::BacenDataTypes)::Float64
 end
 
 _parse_from_brazilian_to_float64(x::String)::Float64 = parse(Float64, replace(replace(replace(x, ',' => '*'), '.' => ','), '*' => '.'))
+_parse_from_brazilian_to_float64(x::Int)::Float64 = x * 1.0
 
 function _convert_date_to_BR(date::Date)::String
     dia = day(date)>9 ? string(day(date)) : string(0, day(date))
