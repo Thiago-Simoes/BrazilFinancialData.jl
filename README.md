@@ -9,6 +9,22 @@ Ideas can also, and should, be sent.
 > 2. Paste `using Pkg`.
 > 3. Paste `Pkg.add("BrazilFinancialData")`
 > 4. That's all! 🎉🎉 
+
+
+>## Release notes:
+> ---
+> ### **v0.1.4**:
+> Based on Python lib brFinance(@eudesrodrigo) now implemented the functionality of download company financial statements directly from Julia using HTTP.jl and WebScrapping packages.   
+> Now, the package uses brFinance only for one specific functionality that I couldn't get to work. ASAP I will release a full Julia version.
+> 
+>**Financial statements**:
+>    - Balanço Patrimonial Ativo (Balance sheet - Assets)
+>    - Balanço Patrimonial Passivo (Balance sheet - Liabilities)
+>    - Demonstração do Resultado (Income statement)
+>    - Demonstração do Resultado Abrangente
+>    - Demonstração do Fluxo de Caixa (Cash flow statement)
+>    - <s>Demonstração das Mutações do Patrimônio Líquido</s> (pending implementation)
+>    - Demonstração de Valor Adicionado
   
   
 ## Actual features
