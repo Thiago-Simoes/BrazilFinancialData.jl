@@ -27,7 +27,6 @@ const bacen_data_indx = Dict(
     :DividaLiqPIB => (4503, Percentage),
     :CDI_Diario => (12, Percentage),
     :CDI_Diario_Anualizado => (4389, Percentage),
-    # Cestas basicas
     :CestaBasicaAracaju => (7479, Money_BRL), 
     :CestaBasicaBelem => (7480, Money_BRL), 
     :CestaBasicaBeloHorizonte => (7481, Money_BRL), 
