@@ -122,6 +122,7 @@ function _get_bacen_data(
     
     if "valor" in names(df_ret)
         foo(x) = _data_converter(x, type)
+        dropmissing!(df_ret)
         df_ret.valor = foo.(df_ret.valor)
         rename!(df_ret, "valor" => string(indicator))
     end
