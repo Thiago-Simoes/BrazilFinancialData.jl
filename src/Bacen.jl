@@ -132,7 +132,7 @@ function _get_bacen_data(
     return df_ret
 end
 
-function _data_converter(input::String, dataType::BacenDataTypes)::Float64
+function _data_converter(input::AbstractString, dataType::BacenDataTypes)::Float64
     if dataType == Money_BRL
        return _parse_from_brazilian_to_float64(input)
     elseif dataType == Percentage
@@ -155,7 +155,7 @@ function _convert_date_to_BR(date::Date)::String
     return string(dia, "/", mes, "/", year(date))
 end
 
-function _convert_BR_to_date(date::String)::Date
+function _convert_BR_to_date(date::AbstractString)::Date
     data = split(date, "/")
     dia = parse(Int64, data[1])
     mes = parse(Int64, data[2])
