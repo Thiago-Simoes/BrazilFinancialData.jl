@@ -133,7 +133,6 @@ function get_cda_data(
                             continue
                         end
                     else
-                        @warn "Nome de arquivo inesperado: $(f.name)"
                         continue
                     end
                     
@@ -145,7 +144,7 @@ function get_cda_data(
                     
                     # Lê o arquivo CSV usando o encoding correto
                     csv_io = read(temp_csv_file, enc"cp1252")
-                    csv_data = CSV.File(csv_io, delim=';', dateformat="yyyy-mm-dd", decimal='.', types=Dict("VL_MERC_POS_FINAL" => Float64)) |> DataFrame
+                    csv_data = CSV.File(csv_io, delim=';', dateformat="yyyy-mm-dd", decimal='.') |> DataFrame
                     
                     # Remove o arquivo CSV temporário após a leitura
                     rm(temp_csv_file; force=true)
@@ -228,7 +227,7 @@ function search_cda_by_cnpj(
                         total_value += sum(skipmissing(filtered_df.VL_MERC_POS_FINAL))
                         
                         # Acumula as posições
-                        all_positions = vcat(all_positions, filtered_df)
+                        all_positions = vcat(all_positions, filtered_df, cols=:union)
                         
                         # Atualiza o total por bloco
                         block_value = sum(skipmissing(filtered_df.VL_MERC_POS_FINAL))
