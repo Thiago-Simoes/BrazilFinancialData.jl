@@ -49,6 +49,267 @@ end
 @enum HistoricalType HistoricalData RecentData
 
 
+blocosCDA = Dict(
+    "1" => "TÍTULOS PÚBLICOS DO SELIC",
+    "2" => "COTAS DE FUNDOS DE INVESTIMENTO",
+    "3" => "SWAP",
+    "4" => "DEMAIS ATIVOS CODIFICADOS",
+    "5" => "DEPÓSITOS A PRAZO E OUTROS TÍTULOS DE IF",
+    "6" => "TÍTULOS DO AGRONEGÓCIO E DE CRÉDITO PRIVADO",
+    "7" => "INVESTIMENTO NO EXTERIOR",
+    "8" => "DEMAIS ATIVOS NÃO CODIFICADOS"
+)
+
+"""
+    get_cda_data(years::Vector{Int}; include_confidential::Bool = false)::Dict{Int, Dict{String, DataFrame}}
+
+Baixa e lê os dados CDA da CVM para os anos especificados.
+
+# Parâmetros
+- `years`: Lista dos anos desejados.
+- `include_confidential`: Se `true`, inclui os dados confidenciais.
+
+# Retorno
+- Um dicionário onde cada ano mapeia para um dicionário de blocos, e cada bloco mapeia para um DataFrame com os dados.
+
+# Exemplo
+```julia
+cda_data = get_cda_data([2022, 2023])
+"""
+function get_cda_data(
+    years::Vector{Int};
+    include_confidential::Bool = false
+)::Dict{Int, Dict{String, DataFrame}} # Dicionário principal: ano => Dict{bloco => DataFrame} 
+
+    # Dicionário principal: ano => Dict{bloco => DataFrame}
+    data_by_year = Dict{Int, Dict{String, DataFrame}}()
+
+    for year in years
+        data_by_year[year] = Dict{String, DataFrame}()
+        
+        for month in 1:12
+            # Se o ano é maior que o ano atual, não tenta baixar
+            current_year = Dates.year(Dates.today())
+            current_month = Dates.month(Dates.today())
+            if year > current_year || (year == current_year && month > current_month - 1)
+                continue
+            end
+            
+            month_str = lpad(string(month), 2, '0')
+            date_str = string(year, month_str)
+            
+            # Nome do arquivo
+            filename = "cda_fi_$date_str.zip"
+            
+            # URL do arquivo
+            base_url = "https://dados.cvm.gov.br/dados/FI/DOC/CDA/DADOS/"
+            file_url = base_url * filename
+            
+            tmp_zip = ""  # Define tmp_zip antes do bloco try
+            try
+                # Cria um arquivo temporário para o ZIP
+                tmp_zip = tempname() * ".zip"
+                Downloads.download(file_url, tmp_zip)
+                
+                # Lê o arquivo ZIP
+                zip = ZipFile.Reader(tmp_zip)
+                
+                for f in zip.files
+                    # Ignorar arquivos que não sejam .csv
+                    if !endswith(f.name, ".csv")
+                        continue
+                    end
+                    
+                    # Determina o bloco com base no nome do arquivo
+                    if occursin("PL", f.name)
+                        block_name = "PL"
+                    elseif occursin("BLC", f.name)
+                        m = match(r"cda_fi_BLC_(\d)_\d{6}\.csv", f.name)
+                        if m !== nothing
+                            block_number = m.captures[1]
+                            block_name = "$(blocosCDA[string(block_number)])"
+                        else
+                            @warn "Nome de arquivo inesperado: $(f.name)"
+                            continue
+                        end
+                    else
+                        @warn "Nome de arquivo inesperado: $(f.name)"
+                        continue
+                    end
+                    
+                    # Cria um arquivo temporário para o CSV
+                    temp_csv_file = tempname() * ".csv"
+                    open(temp_csv_file, "w") do io
+                        write(io, read(f))
+                    end
+                    
+                    # Lê o arquivo CSV usando o encoding correto
+                    csv_io = read(temp_csv_file, enc"cp1252")
+                    csv_data = CSV.File(csv_io, delim=';', dateformat="yyyy-mm-dd", decimal='.', types=Dict("VL_MERC_POS_FINAL" => Float64)) |> DataFrame
+                    
+                    # Remove o arquivo CSV temporário após a leitura
+                    rm(temp_csv_file; force=true)
+                    
+                    # Adiciona ao DataFrame existente
+                    if haskey(data_by_year[year], block_name)
+                        data_by_year[year][block_name] = vcat(data_by_year[year][block_name], csv_data)
+                    else
+                        data_by_year[year][block_name] = csv_data
+                    end
+                end
+                # Fecha o arquivo ZIP antes de removê-lo
+                close(zip)
+                rm(tmp_zip; force=true)
+            catch err
+                if isa(err, HTTP.ExceptionRequest.StatusError) && err.status == 404
+                    @warn "Arquivo não encontrado: $file_url"
+                else
+                    @warn "Falha ao baixar ou processar $file_url: $(err)"
+                end
+                # Remove o arquivo temporário se existir
+                if tmp_zip != "" && isfile(tmp_zip)
+                    try
+                        rm(tmp_zip; force=true)
+                    catch e
+                        @warn "Não foi possível remover o arquivo temporário $tmp_zip: $(e)"
+                    end
+                end
+            end
+        end
+    end
+    return data_by_year    
+end
+
+
+
+
+"""
+    search_cda_by_cnpj(cda_data::Dict{Int, Dict{String, DataFrame}}, cnpj::String)::Vector{DataFrame}
+
+Busca nos dados CDA por registros correspondentes a um CNPJ específico.
+
+# Parâmetros
+- cda_data: Dados retornados por get_cda_data.
+- cnpj: O CNPJ a ser buscado.
+# Retorno
+- Vetor de DataFrames contendo os registros correspondentes.
+# Exemplo
+```julia
+fund_data = search_cda_by_cnpj(cda_data, "12.345.678/0001-90")
+"""
+function search_cda_by_cnpj(
+    cda_data::Dict{Int, Dict{String, DataFrame}},
+    cnpj::String
+)::Tuple{Dict{Int, Dict{String, DataFrame}}, DataFrame, DataFrame}
+    # Dicionário para armazenar os DataFrames filtrados
+    results = Dict{Int, Dict{String, DataFrame}}()
+    
+    # DataFrame para acumular todas as posições
+    all_positions = DataFrame()
+    
+    # Dicionário para armazenar o valor total por bloco
+    block_totals = Dict{String, Float64}()
+    
+    total_value = 0.0  # Valor total acumulado das posições
+    
+    for (year, blocks) in cda_data
+        filtered_blocks = Dict{String, DataFrame}()
+        for (block_name, df) in blocks
+            if "CNPJ_FUNDO" in names(df)
+                # Filtra o DataFrame pelo CNPJ
+                filtered_df = df[df.CNPJ_FUNDO .== cnpj, :]
+                if nrow(filtered_df) > 0
+                    # Adiciona ao dicionário de resultados
+                    filtered_blocks[block_name] = filtered_df
+                    
+                    # Verifica se a coluna de valor está presente
+                    if "VL_MERC_POS_FINAL" in names(filtered_df)
+                        # Atualiza o valor total
+                        total_value += sum(skipmissing(filtered_df.VL_MERC_POS_FINAL))
+                        
+                        # Acumula as posições
+                        all_positions = vcat(all_positions, filtered_df)
+                        
+                        # Atualiza o total por bloco
+                        block_value = sum(skipmissing(filtered_df.VL_MERC_POS_FINAL))
+                        if haskey(block_totals, block_name)
+                            block_totals[block_name] += block_value
+                        else
+                            block_totals[block_name] = block_value
+                        end
+                    end
+                end
+            end
+        end
+        if !isempty(filtered_blocks)
+            results[year] = filtered_blocks
+        end
+    end
+    
+    # Calcula o percentual de cada posição
+    if nrow(all_positions) > 0 && total_value > 0
+        all_positions.Percentual = (all_positions.VL_MERC_POS_FINAL ./ total_value) .* 100
+        # Ordena em ordem decrescente de percentual
+        all_positions = sort(all_positions, :Percentual, rev=true)
+    else
+        @warn "Nenhuma posição encontrada para o CNPJ especificado."
+    end
+    
+    # Cria o DataFrame com o percentual por bloco
+    percentage_per_block = DataFrame(Block=String[], TotalValue=Float64[], Percentual=Float64[])
+    for (block_name, block_value) in block_totals
+        percent = (block_value / total_value) * 100
+        push!(percentage_per_block, (Block=block_name, TotalValue=block_value, Percentual=percent))
+    end
+    # Ordena o DataFrame de percentuais por bloco
+    percentage_per_block = sort(percentage_per_block, :Percentual, rev=true)
+    
+    return (results, all_positions, percentage_per_block)
+end
+
+
+
+""" 
+    get_global_allocation(cda_data::Dict{Int, Dict{String, DataFrame}})::DataFrame
+
+Calcula a alocação global dos ativos em todos os fundos e anos.
+
+# Parâmetros
+- cda_data: Dados retornados por get_cda_data.
+# Retorno
+DataFrame com os tipos de ativos, valor total de mercado e percentual.
+# Exemplo
+```julia
+global_allocation = get_global_allocation(cda_data)
+"""
+function get_global_allocation(
+    cda_data::Dict{Int, Dict{String, DataFrame}}
+)::DataFrame
+    allocation = DataFrame(TP_ATIVO=String[], VL_MERC_POS_FINAL=Float64[])
+    for (year, blocks) in cda_data
+        for (block_name, df) in blocks
+            if "TP_ATIVO" in names(df) && "VL_MERC_POS_FINAL" in names(df)
+                grouped_df = combine(groupby(df, :TP_ATIVO), :VL_MERC_POS_FINAL => sum => :Total)
+                append!(allocation, grouped_df)
+            end
+        end
+    end
+    
+    # Agrupa novamente para somar valores de anos e blocos diferentes
+    final_allocation = combine(groupby(allocation, :TP_ATIVO), :Total => sum => :Total)
+    
+    # Calcula o percentual
+    total_value = sum(final_allocation.Total)
+    final_allocation.Percentual = (final_allocation.Total ./ total_value) .* 100
+    
+    return final_allocation
+end    
+
+
+
+
+
+
 """
     get_daily_inf_month(
         date::Date;
