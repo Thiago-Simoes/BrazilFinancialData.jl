@@ -92,6 +92,7 @@ function _get_bacen_data(
     initial_date::Union{Date, Nothing} = nothing,
     final_date::Union{Date, Nothing} = nothing
 )::DataFrame
+    type = ""
     if typeof(indicator) <: Symbol
         bacen_indx = bacen_data_indx[indicator]
         str_cod_bacen = string(bacen_indx[1])
@@ -100,7 +101,7 @@ function _get_bacen_data(
         str_cod_bacen = string(indicator)
         type = Values
     end
-
+    str_path = ""
     if typeof(initial_date) <: Nothing || typeof(final_date) <: Nothing
         str_path = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.$(str_cod_bacen)/dados?formato=csv"
     else
