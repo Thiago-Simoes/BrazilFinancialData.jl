@@ -114,7 +114,7 @@ function _get_bacen_data(
 
     @assert isfile(tmp_file)
 
-    df_ret = CSV.File(tmp_file, decimal='.', delim=';') |> DataFrame
+    df_ret = CSV.File(tmp_file, decimal='.', delim=',') |> DataFrame
 
     if "data" in names(df_ret)
         rename!(df_ret, "data" => "Date")
