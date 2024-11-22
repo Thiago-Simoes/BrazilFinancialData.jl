@@ -135,12 +135,12 @@ function _get_bacen_data(
     # Se houver blocos intermediários falhados, tenta buscar novamente no final
     if !isempty(failed_blocks)
         @info "Tentando novamente os blocos falhados."
-        for (start, end) in failed_blocks
+        for (start, final) in failed_blocks
             try
-                data = _get_bacen_data_raw(indicator, start, end)
+                data = _get_bacen_data_raw(indicator, start, final)
                 push!(results, data)
             catch e
-                @warn "Bloco $(start) a $(end) falhou novamente: $e"
+                @warn "Bloco $(start) a $(final) falhou novamente: $e"
             end
         end
     end
