@@ -86,8 +86,76 @@ function get_indicator(
     return ret
 end
 
-
 function _get_bacen_data(
+    indicator::Union{Symbol, Int64}, 
+    start_date::Union{Date, Nothing} = nothing, 
+    end_date::Union{Date, Nothing} = nothing; 
+    max_days::Int = 600
+)::DataFrame
+    # Se `start_date` ou `end_date` forem `nothing`, define os valores padrão
+    start_date = start_date === nothing ? Date("2000-01-01") : start_date
+    end_date = end_date === nothing ? today() : end_date
+    
+    # Verifica se as datas são válidas
+    if start_date > end_date
+        throw(ArgumentError("A data inicial deve ser anterior ou igual à data final."))
+    end
+
+    results = DataFrame[]  # Lista para armazenar resultados por bloco
+    failed_blocks = []  # Para armazenar os blocos que falharem
+    current_start = start_date  # Data inicial para o loop
+
+    while current_start <= end_date
+        # Calcula o final do bloco, respeitando `max_days`
+        current_end = min(current_start + Day(max_days - 1), end_date)
+
+        # Tenta buscar os dados, com retentativa
+        success = false
+        for attempt in 1:2
+            try
+                data = _get_bacen_data_raw(indicator, current_start, current_end)
+                push!(results, data)
+                success = true
+                break  # Sai do loop de retentativa
+            catch e
+                @warn "Erro na tentativa $attempt para o intervalo $(current_start) a $(current_end): $e"
+                sleep(2)  # Aguarda 2 segundos antes da próxima tentativa
+            end
+        end
+
+        # Se falhar após as tentativas, registra o bloco como falhado
+        if !success
+            push!(failed_blocks, (current_start, current_end))
+        end
+
+        # Avança para o próximo bloco
+        current_start = current_end + Day(1)
+    end
+
+    # Se houver blocos intermediários falhados, tenta buscar novamente no final
+    if !isempty(failed_blocks)
+        @info "Tentando novamente os blocos falhados."
+        for (start, end) in failed_blocks
+            try
+                data = _get_bacen_data_raw(indicator, start, end)
+                push!(results, data)
+            catch e
+                @warn "Bloco $(start) a $(end) falhou novamente: $e"
+            end
+        end
+    end
+
+    # Concatena os resultados e ordena por data (se existir coluna "Date")
+    final_result = vcat(results...)
+    if "Date" in names(final_result)
+        sort!(final_result, :Date)
+    end
+
+    return final_result
+end
+
+
+function _get_bacen_data_raw(
     indicator::Union{Symbol, Int64},
     initial_date::Union{Date, Nothing} = nothing,
     final_date::Union{Date, Nothing} = nothing
@@ -114,7 +182,7 @@ function _get_bacen_data(
 
     @assert isfile(tmp_file)
 
-    df_ret = CSV.File(tmp_file, decimal='.', delim=',') |> DataFrame
+    df_ret = CSV.File(tmp_file, decimal='.') |> DataFrame
 
     if "data" in names(df_ret)
         rename!(df_ret, "data" => "Date")
