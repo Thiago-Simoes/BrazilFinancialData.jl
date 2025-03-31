@@ -9,6 +9,7 @@ using ..Downloads
 using ..XLSX
 using ..MethodAnalysis
 using ..StringEncodings
+using ..JSON
 
 @enum BacenDataTypes Money_BRL Percentage Values
 
@@ -112,15 +113,15 @@ function _get_bacen_data(
         # Tenta buscar os dados, com retentativa
         success = false
         for attempt in 1:2
-            try
+            # try
                 data = _get_bacen_data_raw(indicator, current_start, current_end)
                 push!(results, data)
                 success = true
                 break  # Sai do loop de retentativa
-            catch e
-                @warn "Erro na tentativa $attempt para o intervalo $(current_start) a $(current_end): $e"
-                sleep(2)  # Aguarda 2 segundos antes da próxima tentativa
-            end
+            # catch e
+            #     @warn "Erro na tentativa $attempt para o intervalo $(current_start) a $(current_end): $e"
+            #     sleep(2)  # Aguarda 2 segundos antes da próxima tentativa
+            # end
         end
 
         # Se falhar após as tentativas, registra o bloco como falhado
@@ -171,18 +172,18 @@ function _get_bacen_data_raw(
     end
     str_path = ""
     if typeof(initial_date) <: Nothing || typeof(final_date) <: Nothing
-        str_path = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.$(str_cod_bacen)/dados?formato=csv"
+        str_path = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.$(str_cod_bacen)/dados?formato=json"
     else
-        str_path = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.$(str_cod_bacen)/dados?formato=csv&dataInicial=$(_convert_date_to_BR(initial_date))&dataFinal=$(_convert_date_to_BR(final_date))"
+        str_path = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.$(str_cod_bacen)/dados?formato=json&dataInicial=$(_convert_date_to_BR(initial_date))&dataFinal=$(_convert_date_to_BR(final_date))"
     end
 
-    tmp_file = "$(tempname()).csv"
+    tmp_file = "$(tempname()).json"
 
     Downloads.download(str_path, tmp_file)
 
     @assert isfile(tmp_file)
 
-    df_ret = CSV.File(tmp_file, decimal='.') |> DataFrame
+    df_ret = JSON.read(tmp_file) |> String |> JSON.parse |> DataFrames.DataFrame
 
     if "data" in names(df_ret)
         rename!(df_ret, "data" => "Date")
@@ -190,8 +191,7 @@ function _get_bacen_data_raw(
     end
     
     if "valor" in names(df_ret)
-        foo(x) = _data_converter(x, type)
-        dropmissing!(df_ret)
+        foo(x) = parse(Float64, x)
         df_ret.valor = foo.(df_ret.valor)
         rename!(df_ret, "valor" => string(indicator))
     end
