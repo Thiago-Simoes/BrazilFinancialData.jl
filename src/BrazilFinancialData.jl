@@ -14,13 +14,17 @@ using MethodAnalysis
 using StringEncodings
 using JSON
 using PyCall
+using TimeSeries
 
 include("FundsCVM.jl")
 include("Bacen.jl")
 include("FinancialStatementsCVM.jl")
+include("InternationalSources.jl")
 
 export FundsCVM
 export Bacen
 export FinancialStatementsCVM
+export InternationalSources
+
 
 end # module BrazilFinancialData

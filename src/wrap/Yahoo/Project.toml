@@ -1,0 +1,28 @@
+name = "MarketData"
+uuid = "945b72a4-3b13-509d-9b46-1525bb5c06de"
+authors = ["JuliaQuant <https://github.com/JuliaQuant>"]
+version = "0.15.0"
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
+
+[compat]
+CSV = "0.7, 0.8, 0.9, 0.10"
+HTTP = "0.8, 0.9, 1.0"
+JSON3 = "1"
+Reexport = "0.2, 1.0"
+TimeSeries = "0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24"
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
