@@ -19,7 +19,7 @@ using TimeSeries
 include("FundsCVM.jl")
 include("Bacen.jl")
 include("FinancialStatementsCVM.jl")
-include("InternationalSources.jl")
+include("MarketData.jl")
 
 export FundsCVM
 export Bacen
