@@ -1,5 +1,3 @@
-module MarketData
-
 using Dates
 using DataFrames
 
@@ -29,5 +27,3 @@ function fred(series::AbstractString; start_date::Date=Date(2000), end_date::Dat
 end
 fred(series::Symbol; start_date::Date=Date(2000), end_date::Date=today(), ssl_verification::Bool = true)::DataFrame =
   return fred(string(series); start_date=start_date, end_date=end_date, ssl_verification=ssl_verification) |> DataFrame
-
-end
