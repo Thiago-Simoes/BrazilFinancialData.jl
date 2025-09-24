@@ -24,7 +24,5 @@ include("MarketData.jl")
 export FundsCVM
 export Bacen
 export FinancialStatementsCVM
-export InternationalSources
-
 
 end # module BrazilFinancialData
