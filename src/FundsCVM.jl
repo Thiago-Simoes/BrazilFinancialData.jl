@@ -24,6 +24,43 @@ using ..StringEncodings
 include(string(@__DIR__,"/Utils.jl"))
 
 
+function _find_column_name(df::DataFrame, target::Symbol)
+    target_str = String(target)
+    for name in names(df)
+        if String(name) == target_str
+            return name
+        end
+    end
+    return nothing
+end
+
+function _ensure_column!(df::DataFrame, target::Symbol, aliases::Vector{Symbol})
+    existing = _find_column_name(df, target)
+    if existing !== nothing
+        if existing != target
+            rename!(df, existing => target)
+        end
+        return df
+    end
+
+    for alias in aliases
+        existing_alias = _find_column_name(df, alias)
+        if existing_alias !== nothing
+            rename!(df, existing_alias => target)
+            return df
+        end
+    end
+
+    return df
+end
+
+function _normalize_fund_identifier_columns!(df::DataFrame)
+    _ensure_column!(df, :CNPJ_FUNDO, [:CNPJ_FUNDO_CLASSE])
+    _ensure_column!(df, :TP_FUNDO, [:TP_FUNDO_CLASSE])
+    return df
+end
+
+
 # TODO: Remove this, is only for debugging
 # import JuliaInterpreter
 
@@ -145,6 +182,7 @@ function get_cda_data(
                     # Lê o arquivo CSV usando o encoding correto
                     csv_io = read(temp_csv_file, enc"cp1252")
                     csv_data = CSV.File(csv_io, delim=';', dateformat="yyyy-mm-dd", decimal='.') |> DataFrame
+                    _normalize_fund_identifier_columns!(csv_data)
                     
                     # Remove o arquivo CSV temporário após a leitura
                     rm(temp_csv_file; force=true)
@@ -638,6 +676,7 @@ function _get_fund_statement(data_path::Tuple{String, Date})::DataFrame
         @assert isfile(tmp_file)
         
         ret = CSV.File(open(read, tmp_file, enc"CP1252"), decimal='.', delim=';') |> DataFrame
+        _normalize_fund_identifier_columns!(ret)
 
         DataFrames.sort!(ret, :DT_COMPTC)
         
@@ -691,6 +730,7 @@ function _get_funds_sheet(date::Dates.Date)::Dict{String, DataFrame}
                 io = open(temp_str, "w")
                 write(io, f)
                 tmp = CSV.File(open(read, temp_str, enc"CP1252"), decimal='.', delim=';') |> DataFrame
+                _normalize_fund_identifier_columns!(tmp)
                 # tmp = CSV.File(f, decimal='.', delim=';') |> DataFrame
                 DataFrames.sort!(tmp, :DT_COMPTC)
                 transform!(tmp, 
@@ -743,6 +783,7 @@ function _get_fund_quotes(data_path::Tuple{HistoricalType, String, String, Date}
         ret = DataFrame()
         for f in zip.files
             tmp = CSV.File(f, decimal='.', delim=';') |> DataFrame
+            _normalize_fund_identifier_columns!(tmp)
             if columnindex(tmp, :TP_FUNDO) == 0
                 tmp.TP_FUNDO = Vector{Missing}(undef, nrow(tmp))
             end
@@ -772,6 +813,7 @@ function _get_fund_quotes(data_path::Tuple{HistoricalType, String, String, Date}
     for f in zip.files
         if f.name == data_path[3]
             ret = CSV.File(f, decimal='.', delim=';') |> DataFrame
+            _normalize_fund_identifier_columns!(ret)
             if columnindex(ret, :TP_FUNDO) == 0
                 ret.TP_FUNDO = Vector{Missing}(undef, nrow(ret))
             end
